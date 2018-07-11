@@ -2,6 +2,7 @@ package io.atlassian.fugue;
 
 import java.util.Collections;
 import java.util.NoSuchElementException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
@@ -149,6 +150,15 @@ import static java.util.function.Function.identity;
   public abstract <B> Try<B> map(Function<? super A, ? extends B> f);
 
   /**
+   * Calls the given function with the value from this `Success` and returns this
+   * unchanged.
+   *
+   * @param f the function to call
+   * @return returns the value unchanged.
+   */
+  public abstract Try<A> peek(Consumer<? super A> f);
+
+  /**
    * Applies the given function `f` if this is a `Failure` otherwise this
    * unchanged if a 'Success'. This is like map for the failure.
    *
@@ -256,6 +266,11 @@ import static java.util.function.Function.identity;
       return Try.failure(e);
     }
 
+    @Override
+    public Try<A> peek(Consumer<? super A> f) {
+      return this;
+    }
+
     @Override public Try<A> recover(final Function<? super Exception, A> f) {
       return Checked.now(() -> f.apply(e));
     }
@@ -328,6 +343,14 @@ import static java.util.function.Function.identity;
 
     @Override public <B> Try<B> flatMap(final Function<? super A, Try<B>> f) {
       return f.apply(value);
+    }
+
+    @Override
+    public Try<A> peek(Consumer<? super A> f) {
+      return Checked.now(() -> {
+        f.accept(value);
+        return value;
+      });
     }
 
     @Override public Try<A> recover(final Function<? super Exception, A> f) {
@@ -413,6 +436,15 @@ import static java.util.function.Function.identity;
 
     @Override public <B> Try<B> map(Function<? super A, ? extends B> f) {
       return composeDelayed(t -> t.map(f));
+    }
+
+    @Override
+    public Try<A> peek(Consumer<? super A> f) {
+      return composeDelayed(t ->
+              t.map(value -> {
+                f.accept(value);
+                return value;
+              }));
     }
 
     @Override public Try<A> recover(Function<? super Exception, A> f) {

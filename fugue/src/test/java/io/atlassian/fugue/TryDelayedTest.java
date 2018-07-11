@@ -53,6 +53,19 @@ public class TryDelayedTest {
     assertThat(evaluated.get(), is(1));
   }
 
+
+  @Test public void peekDoesNotEvaluate() {
+    AtomicInteger spy = new AtomicInteger(666);
+    AtomicInteger evaluated = new AtomicInteger(0);
+    Try<Integer> a = Checked.delay(() -> evaluated.addAndGet(1));
+    Try<Integer> b = a.peek(spy::set);
+    assertThat(evaluated.get(), is(0));
+    assertThat(spy.get(), is(666));
+    assertThat(b.getOrElse(() -> -1), is(1));
+    assertThat(evaluated.get(), is(1));
+    assertThat(spy.get(), is(1));
+  }
+
   @Test public void recoverDoesNotEvaluate() {
     AtomicInteger evaluated = new AtomicInteger(0);
     Try<Integer> a = Checked.delay(() -> {

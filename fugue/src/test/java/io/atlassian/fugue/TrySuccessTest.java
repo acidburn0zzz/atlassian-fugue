@@ -5,6 +5,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static java.util.function.Function.identity;
@@ -56,6 +57,17 @@ public class TrySuccessTest {
     thrown.expect(TestException.class);
 
     t.flatMap(fTryThrows);
+  }
+
+  @Test public void peekDoesNotChangeValue() {
+    final Try<Integer> t2 = t.peek(value -> {});
+    assertThat(t2, is(t));
+  }
+
+  @Test public void peekDispatchValueToConsumer() {
+    AtomicInteger counter = new AtomicInteger(666);
+    t.peek(counter::set);
+    assertThat(counter.get(), is(STARTING_VALUE));
   }
 
   @Test public void recover() throws Exception {
