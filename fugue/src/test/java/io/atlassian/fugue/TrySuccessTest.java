@@ -64,6 +64,11 @@ public class TrySuccessTest {
     assertThat(t2, is(t));
   }
 
+  @Test public void peekDoesNotChangeValueWhenCrashed() {
+    final Try<Integer> t2 = t.peek(value -> { throw new RuntimeException("problem"); });
+    assertThat(t2, is(t));
+  }
+
   @Test public void peekDispatchValueToConsumer() {
     AtomicInteger counter = new AtomicInteger(666);
     t.peek(counter::set);

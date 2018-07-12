@@ -151,7 +151,10 @@ import static java.util.function.Function.identity;
 
   /**
    * Calls the given function with the value from this `Success` and returns this
-   * unchanged.
+   * unchanged. When the consumer throws exception, that will not affect the value.
+   * <p>
+   * This method exists mainly to support debugging, where you want to see
+   * the value as they flow past a certain point.
    *
    * @param f the function to call
    * @return returns the value unchanged.
@@ -347,10 +350,8 @@ import static java.util.function.Function.identity;
 
     @Override
     public Try<A> peek(Consumer<? super A> f) {
-      return Checked.now(() -> {
-        f.accept(value);
-        return value;
-      });
+      final Try<A> ignored = map(a -> { f.accept(a); return a;});
+      return this;
     }
 
     @Override public Try<A> recover(final Function<? super Exception, A> f) {
@@ -440,11 +441,13 @@ import static java.util.function.Function.identity;
 
     @Override
     public Try<A> peek(Consumer<? super A> f) {
-      return composeDelayed(t ->
-              t.map(value -> {
-                f.accept(value);
-                return value;
-              }));
+      return composeDelayed(t -> {
+                t.map(a -> {
+                  f.accept(a);
+                  return a;
+                });
+                return t;
+              });
     }
 
     @Override public Try<A> recover(Function<? super Exception, A> f) {
