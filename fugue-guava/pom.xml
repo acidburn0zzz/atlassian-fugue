@@ -39,8 +39,8 @@
                             io.atlassian.fugue.extras.*;version="${fugue.osgi.export.version}"
                         </Export-Package>
                         <Import-Package>
-                            com.google.common.base;version="${guava.osgi.version}",
-                            com.google.common.collect;version="${guava.osgi.version}",
+                            com.google.common.base",
+                            com.google.common.collect",
                             *
                         </Import-Package>
                     </instructions>
@@ -55,6 +55,11 @@
 
 
     <dependencies>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
