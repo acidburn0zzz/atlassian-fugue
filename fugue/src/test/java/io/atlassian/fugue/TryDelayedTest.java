@@ -7,6 +7,7 @@ import org.junit.rules.ExpectedException;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -57,72 +58,6 @@ public class TryDelayedTest {
     Try<Integer> b = a.map(i -> i * 10);
     assertThat(evaluated.get(), is(0));
     assertThat(b.getOrElse(() -> -1), is(10));
-    assertThat(evaluated.get(), is(1));
-  }
-
-  @Test public void recoverDoesNotEvaluate() {
-    AtomicInteger evaluated = new AtomicInteger(0);
-    Try<Integer> a = Checked.delay(() -> {
-      evaluated.addAndGet(1);
-      throw new Exception();
-    });
-    Try<Integer> b = a.recover(e -> 0);
-    assertThat(evaluated.get(), is(0));
-    assertThat(b.getOrElse(() -> -1), is(0));
-    assertThat(evaluated.get(), is(1));
-  }
-
-  @Test public void recoverWithDoesNotEvaluate() {
-    AtomicInteger evaluated = new AtomicInteger(0);
-    Try<Integer> a = Checked.delay(() -> {
-      evaluated.addAndGet(1);
-      throw new Exception();
-    });
-    Try<Integer> b = a.recoverWith(e -> Try.successful(0));
-    assertThat(evaluated.get(), is(0));
-    assertThat(b.getOrElse(() -> -1), is(0));
-    assertThat(evaluated.get(), is(1));
-  }
-
-  @Test public void orElseSuccessInstanceDoesNotEvaluate() {
-    AtomicInteger evaluated = new AtomicInteger(0);
-    Try<Integer> a = Checked.delay(() -> evaluated.addAndGet(1));
-    Try<Integer> b = a.orElse(Try.successful(19));
-    assertThat(evaluated.get(), is(0));
-    assertThat(b.getOrElse(() -> -1), is(1));
-    assertThat(evaluated.get(), is(1));
-  }
-
-  @Test public void orElseSuccessSupplierDoesNotEvaluate() {
-    AtomicInteger evaluated = new AtomicInteger(0);
-    Try<Integer> a = Checked.delay(() -> evaluated.addAndGet(1));
-    Try<Integer> b = a.orElse(() -> Try.successful(19));
-    assertThat(evaluated.get(), is(0));
-    assertThat(b.getOrElse(() -> -1), is(1));
-    assertThat(evaluated.get(), is(1));
-  }
-
-  @Test public void orElseFailureInstanceDoesNotEvaluate() {
-    AtomicInteger evaluated = new AtomicInteger(0);
-    Try<Integer> a = Checked.delay(() -> {
-      evaluated.incrementAndGet();
-      throw new RuntimeException();
-    });
-    Try<Integer> b = a.orElse(Try.successful(19));
-    assertThat(evaluated.get(), is(0));
-    assertThat(b.getOrElse(() -> -1), is(19));
-    assertThat(evaluated.get(), is(1));
-  }
-
-  @Test public void orElseFailureSupplierDoesNotEvaluate() {
-    AtomicInteger evaluated = new AtomicInteger(0);
-    Try<Integer> a = Checked.delay(() -> {
-      evaluated.incrementAndGet();
-      throw new RuntimeException();
-    });
-    Try<Integer> b = a.orElse(() -> Try.successful(19));
-    assertThat(evaluated.get(), is(0));
-    assertThat(b.getOrElse(() -> -1), is(19));
     assertThat(evaluated.get(), is(1));
   }
 
@@ -245,4 +180,10 @@ public class TryDelayedTest {
     assertThat(iterator.hasNext(), is(false));
   }
 
+  @Test public void delayedStackSafety() {
+    Try<Integer> sum = IntStream.range(1, 10000).mapToObj(i -> Try.delayed(() -> Try.successful(i)))
+      .reduce(Try.successful(0), (acc, _try) -> acc.flatMap(s -> _try.map(i -> s + i)));
+
+    assertThat(sum.getOrElse(() -> -1), is(IntStream.range(1, 10000).sum()));
+  }
 }

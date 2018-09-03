@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -84,7 +83,8 @@ import static java.util.function.Function.identity;
    * @return a new Delayed Try wrapping the supplier.
    */
   public static <A> Try<A> delayed(final Supplier<Try<A>> supplier) {
-    return Delayed.fromSupplier(supplier);
+      Supplier<Try<A>> memorized = memoize(supplier);
+      return new Delayed<>(successful(Unit()), ignored -> memorized.get());
   }
 
   /**
@@ -599,32 +599,38 @@ import static java.util.function.Function.identity;
     }
   }
 
-  private static final class Delayed<A> extends Try<A> implements Externalizable {
+  private static final class Delayed<P, A> extends Try<A> implements Externalizable {
     private static final long serialVersionUID = 2439842151512848666L;
 
-    private final AtomicReference<Function<Unit, Try<A>>> runReference;
+    private Try<P> prev;
+    private Function<? super P, Try<A>> flatMap;
 
-    static <A> Delayed<A> fromSupplier(final Supplier<Try<A>> delayed) {
-      Supplier<Try<A>> memorized = memoize(delayed);
-      return new Delayed<>(unit -> memorized.get());
-    }
-
-    public Delayed() {
-      this(unit -> {
+    @SuppressWarnings("unchecked") public Delayed() {
+      this(successful((P) Unit()), unit -> {
         throw new IllegalStateException("Try.Delayed() default constructor only required for Serialization. Do not invoke directly.");
       });
     }
 
-    private Delayed(final Function<Unit, Try<A>> run) {
-      this.runReference = new AtomicReference<>(run);
+    private Delayed(final Try<P> prev, final Function<? super P, Try<A>> flatMap) {
+      this.prev = prev;
+      this.flatMap = (Function<? super P, Try<A>> & Serializable)(flatMap::apply);
     }
 
-    private Function<Unit, Try<A>> getRunner() {
-      return this.runReference.get();
+    @SuppressWarnings("unchecked") private <T> Try<A> step() {
+      if (prev instanceof Delayed<?, ?>) {
+        Delayed<T, P> delayed = (Delayed<T, P>) prev;
+        return delayed.prev.flatMap(t -> delayed.flatMap.apply(t).flatMap(flatMap));
+      } else {
+        return prev.flatMap(flatMap);
+      }
     }
 
     private Try<A> eval() {
-      return this.getRunner().apply(Unit());
+      Try<A> eval = this;
+      while (eval instanceof Delayed<?, ?>) {
+        eval = ((Delayed<?, A>) eval).step();
+      }
+      return eval;
     }
 
     @Override public boolean isFailure() {
@@ -635,32 +641,28 @@ import static java.util.function.Function.identity;
       return eval().isSuccess();
     }
 
-    private <B> Try<B> composeDelayed(Function<Try<A>, Try<B>> f) {
-      return new Delayed<>(f.compose(this.getRunner()));
-    }
-
     @Override public <B> Try<B> flatMap(Function<? super A, Try<B>> f) {
-      return composeDelayed(t -> t.flatMap(f));
+      return new Delayed<>(this, f);
     }
 
     @Override public <B> Try<B> map(Function<? super A, ? extends B> f) {
-      return composeDelayed(t -> t.map(f));
+      return new Delayed<>(this, f.andThen(Try::successful));
     }
 
     @Override public Try<A> recover(Function<? super Exception, A> f) {
-      return composeDelayed(t -> t.recover(f));
+      return eval().recover(f);
     }
 
     @Override public <X extends Exception> Try<A> recover(Class<X> exceptionType, Function<? super X, A> f) {
-      return composeDelayed(t -> t.recover(exceptionType, f));
+      return eval().recover(exceptionType, f);
     }
 
     @Override public Try<A> recoverWith(Function<? super Exception, Try<A>> f) {
-      return composeDelayed(t -> t.recoverWith(f));
+      return eval().recoverWith(f);
     }
 
     @Override public <X extends Exception> Try<A> recoverWith(Class<X> exceptionType, Function<? super X, Try<A>> f) {
-      return composeDelayed(t -> t.recoverWith(exceptionType, f));
+      return eval().recoverWith(exceptionType, f);
     }
 
     @Override public A getOrElse(Supplier<A> s) {
@@ -668,11 +670,11 @@ import static java.util.function.Function.identity;
     }
 
     @Override public Try<A> orElse(Supplier<? extends Try<? extends A>> orElse) {
-      return composeDelayed(t -> t.orElse(orElse));
+      return eval().orElse(orElse);
     }
 
     @Override public Try<A> filterOrElse(Predicate<? super A> p, Supplier<Exception> orElseSupplier) {
-      return composeDelayed(t -> t.filterOrElse(p, orElseSupplier));
+      return new Delayed<>(this, a -> p.test(a) ? successful(a) : failure(orElseSupplier.get()));
     }
 
     @Override public <B> B fold(Function<? super Exception, B> failureF, Function<A, B> successF) {
@@ -708,7 +710,8 @@ import static java.util.function.Function.identity;
 
     @Override @SuppressWarnings("unchecked") public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
       Try<A> result = (Try<A>) in.readObject();
-      this.runReference.set(unit -> result);
+      this.prev = Try.successful((P) Unit());
+      this.flatMap = p -> result;
     }
   }
 }
