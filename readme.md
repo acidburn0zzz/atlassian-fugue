@@ -37,7 +37,7 @@ And then add fugue as a dependency to your pom.xml:
         <dependency>
             <groupId>com.atlassian.fugue</groupId>
             <artifactId>fugue</artifactId>
-            <version>2.7.0</version>
+            <version>2.8.0</version>
         </dependency>
         ...
     </dependencies>
@@ -56,10 +56,7 @@ And then add fugue as a dependency to your `dependencies` section:
 
 ## Guava compatibility
 
-This library mostly only depends on core Guava functionality and should be compatible with
-somewhat old versions of Guava, and certainly with the newest versions (at the time of writing,
-this is known to be compatible with Guava 23.1, but a minimum of 16.0.1 is needed to run the
-tests).
+This library requires at least Guava 26.0-jre.
 
 ## Scala Integration
 
