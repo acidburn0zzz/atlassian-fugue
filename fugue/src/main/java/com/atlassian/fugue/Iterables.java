@@ -40,6 +40,7 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.PeekingIterator;
@@ -66,7 +67,7 @@ public class Iterables {
 
   static final Iterable<?> EMPTY = new Iterable<Object>() {
     @Override public Iterator<Object> iterator() {
-      return Iterators.emptyIterator();
+      return ImmutableSet.of().iterator();
     }
 
     @Override public String toString() {
